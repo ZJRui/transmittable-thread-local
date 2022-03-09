@@ -335,19 +335,6 @@ Compilation/build environment require **_`JDK 8~11`_**; Compilation can be perfo
 mvn install
 ```
 
-## How to development by `IDE`
-
-If you use `IDE` to develop (such as `IntelliJ IDEA`), note that:
-open **_the `pom4ide.xml` file in the root directory of the project_** instead of `pom.xml` via `IDE`;
-To avoid `IDE` complain using `JDK 8` standard library classes not found.
-
-The reason that `IDE` support is not good / have to change a `POM` file, is:  
-The code implementation of `TTL` uses the `JDK 8` standard library class, but it is compiled into a `Java 6` version class files.
-
-# 🗿 More Documentation
-
-- [🎓 Developer Guide](docs/developer-guide-en.md)
-
 # 📚 Related Resources
 
 ## JDK Core Classes

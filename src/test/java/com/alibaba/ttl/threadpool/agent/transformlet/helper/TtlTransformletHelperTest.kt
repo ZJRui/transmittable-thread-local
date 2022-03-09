@@ -26,7 +26,7 @@ class TtlTransformletHelperTest {
 
         MatcherAssert.assertThat(
             getLocationFileOfClass(StringUtils::class.java),
-            CoreMatchers.endsWith("/commons-lang3-3.5.jar")
+            CoreMatchers.endsWith("/commons-lang3-3.12.0.jar")
         )
     }
 
@@ -45,7 +45,7 @@ class TtlTransformletHelperTest {
         // Java 8: file:/path/to/commons-lang3-3.5.jar!/org/apache/commons/lang3/StringUtils.class
         MatcherAssert.assertThat(
             getLocationFileOfClass(classPool.getCtClass("org.apache.commons.lang3.StringUtils")),
-            CoreMatchers.endsWith("/commons-lang3-3.5.jar!/org/apache/commons/lang3/StringUtils.class")
+            CoreMatchers.endsWith("/commons-lang3-3.12.0.jar!/org/apache/commons/lang3/StringUtils.class")
         )
     }
 
