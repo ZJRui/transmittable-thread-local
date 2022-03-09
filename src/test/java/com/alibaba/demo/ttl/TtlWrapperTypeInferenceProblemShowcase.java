@@ -34,7 +34,7 @@ public class TtlWrapperTypeInferenceProblemShowcase {
     }
 
     private List<Integer> buildSourceList(int length) {
-        List<Integer> l = new ArrayList<Integer>();
+        List<Integer> l = new ArrayList<>();
         for (int i = 0; i < length; ++i) {
             l.add(i);
         }

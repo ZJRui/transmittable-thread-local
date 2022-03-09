@@ -39,12 +39,7 @@ public class TransmittableThreadLocal_withInit_Null_Test {
         }
 
         try {
-            TransmittableThreadLocal.withInitialAndCopier(new Supplier<String>() {
-                @Override
-                public String get() {
-                    return null;
-                }
-            }, null);
+            TransmittableThreadLocal.withInitialAndCopier((Supplier<String>) () -> null, null);
             fail();
         } catch (NullPointerException e) {
             assertEquals("ttl copier is null", e.getMessage());
@@ -62,29 +57,14 @@ public class TransmittableThreadLocal_withInit_Null_Test {
         }
 
         try {
-            TransmittableThreadLocal.withInitialAndCopier(new Supplier<String>() {
-                @Override
-                public String get() {
-                    return null;
-                }
-            }, null, null);
+            TransmittableThreadLocal.withInitialAndCopier((Supplier<String>) () -> null, null, null);
             fail();
         } catch (NullPointerException e) {
             assertEquals("ttl copier for child value is null", e.getMessage());
         }
 
         try {
-            TransmittableThreadLocal.withInitialAndCopier(new Supplier<String>() {
-                @Override
-                public String get() {
-                    return null;
-                }
-            }, new TtlCopier<String>() {
-                @Override
-                public String copy(String parentValue) {
-                    return null;
-                }
-            }, null);
+            TransmittableThreadLocal.withInitialAndCopier(() -> null, (TtlCopier<String>) parentValue -> null, null);
             fail();
         } catch (NullPointerException e) {
             assertEquals("ttl copier for copy value is null", e.getMessage());

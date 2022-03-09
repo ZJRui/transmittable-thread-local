@@ -51,6 +51,6 @@ class DisableInheritableThreadFactoryWrapper implements DisableInheritableThread
 
     @Override
     public String toString() {
-        return this.getClass().getName() + " - " + threadFactory.toString();
+        return this.getClass().getName() + " - " + threadFactory;
     }
 }

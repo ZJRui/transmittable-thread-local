@@ -61,7 +61,7 @@ public final class TtlTransformletHelper {
 
             return clazz.getURL();
         } catch (Exception e) {
-            logger.warn("Fail to getLocationUrlOfClass " + clazz.getName() + ", cause: " + e.toString());
+            logger.warn("Fail to getLocationUrlOfClass " + clazz.getName() + ", cause: " + e);
             return null;
         }
     }
@@ -86,7 +86,7 @@ public final class TtlTransformletHelper {
 
             return codeSource.getLocation();
         } catch (Exception e) {
-            logger.warn("Fail to getLocationUrlOfClass " + clazz.getName() + ", cause: " + e.toString());
+            logger.warn("Fail to getLocationUrlOfClass " + clazz.getName() + ", cause: " + e);
             return null;
         }
     }

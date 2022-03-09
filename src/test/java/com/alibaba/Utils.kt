@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.ThreadPoolExecutor
+import kotlin.math.min
 
 
 /**
@@ -18,7 +19,7 @@ import java.util.concurrent.ThreadPoolExecutor
 fun expandThreadPool(executor: ExecutorService) {
     val cpuCountX2 = Runtime.getRuntime().availableProcessors() * 2
     val count = if (executor is ThreadPoolExecutor) {
-        Math.min(executor.maximumPoolSize * 2, cpuCountX2)
+        min(executor.maximumPoolSize * 2, cpuCountX2)
     } else cpuCountX2
 
     (0 until count).map {

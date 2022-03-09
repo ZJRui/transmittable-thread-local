@@ -207,7 +207,7 @@ public final class TtlAgent {
 
             logger.info(logTtlAgentConfig());
 
-            final List<TtlTransformlet> transformletList = new ArrayList<TtlTransformlet>();
+            final List<TtlTransformlet> transformletList = new ArrayList<>();
 
             transformletList.add(new JdkExecutorTtlTransformlet());
             transformletList.add(new PriorityBlockingQueueTtlTransformlet());
@@ -224,7 +224,7 @@ public final class TtlAgent {
 
             ttlAgentLoaded = true;
         } catch (Exception e) {
-            String msg = "Fail to load TtlAgent , cause: " + e.toString();
+            String msg = "Fail to load TtlAgent , cause: " + e;
             logger.error(msg, e);
             throw new IllegalStateException(msg, e);
         }
