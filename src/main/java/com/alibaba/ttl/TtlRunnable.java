@@ -39,6 +39,12 @@ public final class TtlRunnable implements Runnable, TtlWrapper<Runnable>, TtlEnh
     private final boolean releaseTtlValueReferenceAfterRun;
 
     private TtlRunnable(@NonNull Runnable runnable, boolean releaseTtlValueReferenceAfterRun) {
+        /**
+         *
+         * 创建子线程的时候 ，子线程会自动从父线程复制 InheritableThreadLocalMap。
+         * 但是提交任务的线程 和 线程池中的线程并不是父子关系， 因此  需要考虑如何将提交任务的线程 数据放置到 线程池的线程中。
+         *
+         */
         this.capturedRef = new AtomicReference<Object>(capture());
         this.runnable = runnable;
         this.releaseTtlValueReferenceAfterRun = releaseTtlValueReferenceAfterRun;
@@ -54,6 +60,10 @@ public final class TtlRunnable implements Runnable, TtlWrapper<Runnable>, TtlEnh
             throw new IllegalStateException("TTL value reference is released after run!");
         }
 
+        /**
+         * 当线程执行时，调用 TtlRunnable run 方法，TtlRunnable 会从 AtomicReference 中获取出调用线程中所有的上下文，
+         * 并把上下文给 TransmittableThreadLocal.Transmitter.replay 方法把上下文复制到当前线程。并把上下文备份。
+         */
         final Object backup = replay(captured);
         try {
             runnable.run();

@@ -66,6 +66,23 @@ import java.util.logging.Logger;
  * @since 0.10.0
  */
 public class TransmittableThreadLocal<T> extends InheritableThreadLocal<T> implements TtlCopier<T> {
+    /**
+     *
+     * TransmittableThreadLocal(TTL) 可以将提交任务的线程的值传递给执行任务的线程。
+     * 注意：TransmittableThreadLocal 扩展了 InheritableThreadLocal，所以 TransmittableThreadLocal 首先是一个 InheritableThreadLocal。
+     * 如果来自 InheritableThreadLocal 的可继承能力有潜在的泄漏问题，您可以禁用可继承能力：
+     * ❶ 对于线程池组件（java.util.concurrent.ThreadPoolExecutor、java.util.concurrent.ForkJoinPool），永远不应该发生可继承特性，
+     * 因为线程池组件中的线程是预先创建和池化的，这些线程对业务逻辑是中立的/数据。通过使用方法 getDisableInheritableThreadFactory / g
+     * etDefaultDisableInheritableForkJoinWorkerThreadFactory 包装线程工厂来禁用线程池组件的可继承。
+     * 或者您可以通过com.alibaba.ttl.threadpool.agent.TtlAgent开启“禁用线程池可继承”，以便自动透明地为线程池组件包装线程工厂。
+     * ❷ 在其他情况下，通过覆盖方法 childValue(Object) 禁用可继承。该值是否可继承可由数据所有者控制，当数据所有者有明确的想法时，请谨慎禁用它。
+     *   TransmittableThreadLocal<String> transfertableThreadLocal = new TransmittableThreadLocal<>()
+     *   { protected String childValue(String parentValue) { return initialValue(); } }
+     *
+     *
+     *
+     *
+     */
     private static final Logger logger = Logger.getLogger(TransmittableThreadLocal.class.getName());
 
     private final boolean disableIgnoreNullValueSemantics;
@@ -310,8 +327,54 @@ public class TransmittableThreadLocal<T> extends InheritableThreadLocal<T> imple
         return copy(get());
     }
 
+
+    /**
+     * TransmittableThreadLocal 中的 这个holder是一个全局 静态变量，因此在所有的线程中都共享同一个
+     *
+     *
+     *initiaValue 方法在InheritableThreadLocal创建的时候调用，默认会创建一个WeakHashMap，因此holder 这个InheritableThreadLocal对应的value就是一个weakHashMap
+     *
+     *
+     * -----------------------------------------------------
+     *
+     * (1) 我们知道 当 ThreadLocal 在线程A中执行set方法的时候 这个ThreadLocal会被作为key放置到 当前线程的ThreadLocalMap中。  下面虽然创建了一个holder对象
+     * 而且这个holder是静态代码，当前的线程是main线程，但是 这个时候我们并没有 调用holder的set方法 将其放置到 main线程的ThreadLocal中，因此 main线程的 inheritableThreadLocals
+     * 中并没有 holder这个InheritableThreadLocal。  实时上 不仅仅是set方法会将 ThreadLocal-value键值对放置到ThreadLocalMap中，当我们调用get方法的时候 如果ThreadLocalMap中没有
+     * 当前的ThreadLocal，那么也会将 ThreadLocal-null放置到 ThreadLocalMap中。 若ThreadLocal设置了初始值，那么就将ThreadLocal-initValue 放置到ThreadLocalMap中。
+     *
+     * （2）我们为 holder这个InheritableThreadLocal通过 initValue方法指定了初始值，仅仅表示存在这样一个键值对 key是InheritableThreadLocal这个ThreadLocal，value是一个WeakHashmap，当前
+     * 这个键值对并没有放置到任何线程的ThreadLocalMap中。  ThreadLocal没有调用get set方法 时就不会将这个ThreadLocal放置到线程的ThreadLocalMap中。
+     *
+     *
+     * (3)   ThreadLocal的get方法 不仅仅 是从当前线程的ThreadLocalMap中 使用threadLocal作为key 获取对应的value，  在get方法中 如果发现 当前ThreadLocal不在
+     * 线程的ThreadLocalMap中，则会执行 ThreadLocal的setInitialValue方法 获取ThreadLocal的initValue，并将 <ThraedLocal,initValue>作为键值对放置到当前线程的ThreadLocalMap中。
+     *
+     * 基于第三点的讨论， 在main线程中创建一个TransmittableThreadLocal对象，调用ttl.set ,在set方法中会执行  holder.get()  这就会 导致 在当前线程的inheritableThreadLocalMap 这个结构中
+     * 以holder作为key 寻找是否存在值，main线程中不存在，则会以<holder,WeakHashmap>作为键值对 放置到 main线程的 InheritableThreadLocalMap 中。 于此同时 因为ttl对象本身是一个InheritableThreadLocal
+     * 其set方法中调用了superset 因此  ttl对象 和设置的value也会被作为键值对放置到当前线程的 InheritableThreadLocalMap中。
+     *
+     * （4）在set方法中我们看到 系统中所有的 TransmittableThreadLocal调用 set方法的时候 都会将其放置到 静态变量 holder 对应的WeakHashMap中。
+     *   也就是说 Main线程中有三个ttl 变量， holder在main线程的 inhTMap中 有一个WeakHashMap，这个WeakHashMap中就会存放三个ttl 变量。
+     *   当main线程创建 子线程A的时候 ， 子线程A会从main线程复制拷贝inhTMap， 因此子线程A 的inhTMap 中也会有一个以holder为key 的WeakHashMap，这个WeakHashMap也存在三个 ttl变量。
+     *   且main线程和 子线程A 的WeakHashMap是不同的对象。
+     *
+     *
+     * (5)对于TransmittableThreadLocal 我们要关注的 是  在一个线程池中，线程池中的线程已经被创建了， 这个时候我从 业务线程提交一个任务到线程池中，如何 实现业务线程内的数据和线程池内数据的同步。
+     *
+     *
+     *
+     * （4）为什么使用 WeakHashMap，因为我们发现 这个weakHashMap的value是null，为什么不使用list
+     *     使用 WeakHashMap 是 “继承” ThreadLocalMap.Entry 的“优良传统”，在没有其它强引用的情况下，下一次GC 时才会被垃圾回收，避免内存泄露。
+     *     程序中可能会使用到多个 ThreadLocal，所以需要使用 Map 作为容器储存，使用 Map 还能快速 remove 当前 ThreadLocal。
+     *
+     *
+     *
+     *
+     *
+     *
+     */
     // Note about the holder:
-    // 1. holder self is a InheritableThreadLocal(a *ThreadLocal*).
+    // 1. holder self is a InheritableThreadLocal(a *ThreadLocal*). 持有者自己是一个 InheritableThreadLocal(a *ThreadLocal*)。
     // 2. The type of value in the holder is WeakHashMap<TransmittableThreadLocal<Object>, ?>.
     //    2.1 but the WeakHashMap is used as a *Set*:
     //        the value of WeakHashMap is *always* null, and never used.
@@ -325,6 +388,25 @@ public class TransmittableThreadLocal<T> extends InheritableThreadLocal<T> imple
 
                 @Override
                 protected WeakHashMap<TransmittableThreadLocal<Object>, ?> childValue(WeakHashMap<TransmittableThreadLocal<Object>, ?> parentValue) {
+
+                    /**
+                     *
+                     *
+                     * childValue 方法会在创建子线程时，Thread调用init方法，  为当前线程创建一个 ThreadLocalMap,这个ThreadLocalMap的key是InheritableThreadLocal，
+                     * 当前线程的ThreadLocalMap中的value来自 父线程的 存放InheritableThreadLocal的ThreadLocalMap中的键值对。 因此Thread.init的时候会遍历
+                     * 父线程的存放InheritableThreadLocal的ThreadLocalMap中的每一个键值对， 取出key：InheritableThreadLocal，调用它的childValue方法，这个
+                     * childValue方法的返回值就是 当前Key InheritableThreadLocal在子线程的存放InheritableThreadLocal的ThreadLocalMap中的value。
+                     *
+                     *
+                     * 比如main线程中 创建一个TransmittableThreadLocal 对象，然后调用set方法 设置值，这个时候在TransmittableThreadLocal的set方法中 （1）首先会将ttl对象作为key和设置的value构成的键值对放置到
+                     * 当前线程的InheritableThreadLocalMap中。  （2）然后 调用holder的get方法，在当前线程的InheritableThreadLocalMap中异holder 作为key查询 对应的value， 如果当前线程的InheritableThreadLocalMap中
+                     * 没有holder，则 将创建一个新的键值对(holder,weakhashMap)放置到 当前线程的InheritableThreadLocalMap中。
+                     *
+                     * 然后当前线程创建 线程A的时候， 线程A的InheritableThreadLocalMap 会拷贝 父线程的InheritableThreadLocalMap。 在拷贝其中的（holder，weakhashMap）键值对的时候 就会调用这个childValue方法。
+                     * 这个childvalue 方法会返回一个新的WeakHashMap，因此在 线程A的 InheritableThreadLocalMap中会存放 （holder，WeakHashMapB）这样一个键值对
+                     *
+                     */
+
                     return new WeakHashMap<TransmittableThreadLocal<Object>, Object>(parentValue);
                 }
             };
@@ -493,6 +575,14 @@ public class TransmittableThreadLocal<T> extends InheritableThreadLocal<T> imple
 
         private static HashMap<TransmittableThreadLocal<Object>, Object> captureTtlValues() {
             HashMap<TransmittableThreadLocal<Object>, Object> ttl2Value = new HashMap<TransmittableThreadLocal<Object>, Object>();
+            /**
+             * 创建子线程的时候 ，子线程会自动从父线程复制 InheritableThreadLocalMap。
+             * 但是提交任务的线程 和 线程池中的线程并不是父子关系， 因此  需要考虑如何将提交任务的线程 数据放置到 线程池的线程中。
+             *
+             * 获取当前线程中所有的TransmittableThreadLocal，然后根据ttl 从当先线程中取值，取出来的值构成键值对 存放到runnable的hashMap中
+             *
+             */
+
             for (TransmittableThreadLocal<Object> threadLocal : holder.get().keySet()) {
                 ttl2Value.put(threadLocal, threadLocal.copyValue());
             }
@@ -527,6 +617,11 @@ public class TransmittableThreadLocal<T> extends InheritableThreadLocal<T> imple
 
         @NonNull
         private static HashMap<TransmittableThreadLocal<Object>, Object> replayTtlValues(@NonNull HashMap<TransmittableThreadLocal<Object>, Object> captured) {
+            /**
+             * 将threadLocal的值放到backup变量
+             * 如果capturedMap不包含holder中该线程的threadLocal的key，将holder中多余的threadLocal key remove, 将其父类的threadLocal变量移除，避免线程运行时获取ttl的干扰
+             *
+             */
             HashMap<TransmittableThreadLocal<Object>, Object> backup = new HashMap<TransmittableThreadLocal<Object>, Object>();
 
             for (final Iterator<TransmittableThreadLocal<Object>> iterator = holder.get().keySet().iterator(); iterator.hasNext(); ) {
@@ -544,6 +639,7 @@ public class TransmittableThreadLocal<T> extends InheritableThreadLocal<T> imple
             }
 
             // set TTL values to captured
+            //剩下的ttl塞到当前线程中
             setTtlValuesTo(captured);
 
             // call beforeExecute callback
